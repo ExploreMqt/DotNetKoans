@@ -8,22 +8,37 @@ namespace AutoKoanRunner
 {
 	class Program
 	{
-		private static readonly string koansSource = @"..\..\..\CSharp";
-		private static readonly string koansAssembly = @"..\..\..\CSharp\bin\debug\csharp.dll";
+		private static readonly string CSharpKoanSource = @"..\..\..\CSharp";
+		private static readonly string CSharpKoansAssembly = @"..\..\..\CSharp\bin\debug\csharp.dll";
+
+		private static readonly string VBNetKoanSource = @"..\..\..\VBNet";
+		private static readonly string VBNetKoansAssembly = @"..\..\..\VBNet\bin\debug\VBNet.dll";
+
 		private static readonly string koansRunner = @"..\..\..\KoanRunner\bin\debug\koanrunner.exe";
 		private static DateTime lastChange;
-        static void Main(string[] args)
+        private static void Main(string[] args)
 		{
-			if (Directory.Exists(koansSource) == false)
+			if (Directory.Exists(CSharpKoanSource) == false)
 			{
-				Console.WriteLine("The Koans were not where we expecte them to be.");
+				Console.WriteLine("The CSharp Koans were not where we expect them to be.");
 				return;
 			}
-			using (FileSystemWatcher watcher = new FileSystemWatcher(koansSource, "*.cs"))
+			if (Directory.Exists(VBNetKoanSource) == false)
 			{
-				watcher.Changed += StartRunner;
-				watcher.NotifyFilter = NotifyFilters.LastWrite;
-				watcher.EnableRaisingEvents = true;
+				Console.WriteLine("The VB.Net Koans were not where we expect them to be.");
+				return;
+			}
+			FileSystemWatcher CSharpWatcher = new FileSystemWatcher(CSharpKoanSource, "*.cs");
+			FileSystemWatcher VBNetWatcher = new FileSystemWatcher(VBNetKoanSource, "*.vb");
+			try
+			{
+				CSharpWatcher.Changed += StartRunner;
+				CSharpWatcher.NotifyFilter = NotifyFilters.LastWrite;
+				CSharpWatcher.EnableRaisingEvents = true;
+				
+				VBNetWatcher.Changed += StartRunner;
+				VBNetWatcher.NotifyFilter = NotifyFilters.LastWrite;
+				VBNetWatcher.EnableRaisingEvents = true;
 
 				lastChange = DateTime.MinValue;
 
@@ -32,7 +47,16 @@ namespace AutoKoanRunner
 				Console.WriteLine("When you save a Koan, we'll check your work.");
 				Console.WriteLine("Press a key to exit...");
 				Console.ReadKey();
-				watcher.Changed -= StartRunner;
+				
+				CSharpWatcher.Changed -= StartRunner;
+				VBNetWatcher.Changed -= StartRunner;
+			}
+			finally
+			{
+				if (CSharpWatcher != null)
+					CSharpWatcher.Dispose();
+				if (VBNetWatcher != null)
+					VBNetWatcher.Dispose();
 			}
 		}
 		private static void StartRunner(object sender, FileSystemEventArgs e)
@@ -44,23 +68,25 @@ namespace AutoKoanRunner
 					return;
 				lastChange = timestamp;
 			}
-			BuildProject();
-			RunKoans();
+			BuildProject("CSharp");
+			BuildProject("VBNet");
+			RunKoans(koansRunner, CSharpKoansAssembly, "CSharp");
+			RunKoans(koansRunner, VBNetKoansAssembly, "VBNet");
 		}
-		private static bool BuildProject()
+		private static bool BuildProject(string Project)
 		{
 			Console.WriteLine("Building...");
 			using (Process build = new Process())
 			{
 				build.StartInfo.FileName = "devenv";
-				build.StartInfo.Arguments = @"/build Debug /project CSharp ..\..\..\DotNetKoans.sln";
+				build.StartInfo.Arguments = String.Format(@"/build Debug /project {0} ..\..\..\DotNetKoans.sln", Project);
 				build.StartInfo.CreateNoWindow = true;
 				build.Start();
 				build.WaitForExit();
 			}
 			return false;
 		}
-		private static void RunKoans()
+		private static void RunKoans(string koansRunner, string koansAssembly, string projectName)
 		{
 			if (File.Exists(koansAssembly))
 			{
@@ -74,25 +100,26 @@ namespace AutoKoanRunner
 					launch.Start();
 					string output = launch.StandardOutput.ReadToEnd();
 					launch.WaitForExit();
-					EchoResult(output);
+					EchoResult(output, projectName);
 				}
 			}
 			File.Delete(koansAssembly);
 		}
-		private static void EchoResult(string output)
+		private static void EchoResult(string output, string koanProjectName)
 		{
 			string[] lines = output.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
 			const string kExpanded = "has expanded your";
 			const string kDamaged = "has damaged your";
 			Array.ForEach(lines, line =>
 			{
+				string partialNamespace = String.Format(".{0}.", koanProjectName);
 				if (line.Contains(kExpanded))
 				{
-					PrintTestLine(line, ConsoleColor.Green, kExpanded);
+					PrintTestLine(line, ConsoleColor.Green, kExpanded, partialNamespace);
 				}
 				else if (line.Contains(kDamaged))
 				{
-					PrintTestLine(line, ConsoleColor.Red, kDamaged);
+					PrintTestLine(line, ConsoleColor.Red, kDamaged, partialNamespace);
 				}
 				else
 				{
@@ -101,10 +128,9 @@ namespace AutoKoanRunner
 				}
 			});
 		}
-		private static void PrintTestLine(string line, ConsoleColor accent, string action)
+		private static void PrintTestLine(string line, ConsoleColor accent, string action, string KoanAssembly)
 		{
-			const string kKoanAssembly = ".CSharp.";
-			int testStart = line.IndexOf(kKoanAssembly) + kKoanAssembly.Length;
+			int testStart = line.IndexOf(KoanAssembly) + KoanAssembly.Length;
 			int testEnd = line.IndexOf(action, testStart);
 			Console.ForegroundColor = ConsoleColor.White;
 			Console.Write(line.Substring(0, testStart));
