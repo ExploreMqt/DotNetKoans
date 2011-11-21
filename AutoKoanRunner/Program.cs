@@ -73,13 +73,13 @@ namespace AutoKoanRunner
 			RunKoans(koansRunner, CSharpKoansAssembly, "CSharp");
 			RunKoans(koansRunner, VBNetKoansAssembly, "VBNet");
 		}
-		private static bool BuildProject(string Project)
+		private static bool BuildProject(string projectName)
 		{
-			Console.WriteLine("Building...");
+			Console.WriteLine(String.Format("Building '{0}' Koans ...", projectName));
 			using (Process build = new Process())
 			{
 				build.StartInfo.FileName = "devenv";
-				build.StartInfo.Arguments = String.Format(@"/build Debug /project {0} ..\..\..\DotNetKoans.sln", Project);
+				build.StartInfo.Arguments = String.Format(@"/build Debug /project {0} ..\..\..\DotNetKoans.sln", projectName);
 				build.StartInfo.CreateNoWindow = true;
 				build.Start();
 				build.WaitForExit();
@@ -90,7 +90,7 @@ namespace AutoKoanRunner
 		{
 			if (File.Exists(koansAssembly))
 			{
-				Console.WriteLine("Checking Koans...");
+				Console.WriteLine(String.Format("Checking '{0}' Koans...", projectName));
 				using (Process launch = new Process())
 				{
 					launch.StartInfo.FileName = koansRunner;
